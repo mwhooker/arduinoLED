@@ -1,60 +1,74 @@
-/* Encoder Library - Basic Example
- * http://www.pjrc.com/teensy/td_libs_Encoder.html
- *
- * This example code is in the public domain.
- */
-
+#include "toggle.h"
 #include <Encoder.h>
 
-// Change these two numbers to the pins connected to your encoder.
-//   Best Performance: both pins have interrupt capability
-//   Good Performance: only the first pin has interrupt capability
-//   Low Performance:  neither pin has interrupt capability
-Encoder myEnc(0, 1);
-//   avoid using pins with LEDs attached
+RGBEncoder *rgb;
+Toggle *toggle;
 
-int redPin = 10, greenPin = 11, bluePin = 13;
+
+void new_color() {
+  Serial.println("Button Press LOW");
+  rgb->next();
+}
+
 
 void setup() {
-  // pinMode(2, INPUT);
-    pinMode(redPin, OUTPUT);
-    pinMode(greenPin, OUTPUT);
-    pinMode(bluePin, OUTPUT);
-
   Serial.begin(9600);
   Serial.println("Basic Encoder Test:");
+  int pins[3] = {
+    10, 11, 13
+  };
+  rgb = new RGBEncoder(pins, 0, 1);
+  toggle = new Toggle(6, new_color);
 }
 
-long oldPosition  = -999;
 
+RGBEncoder::RGBEncoder(int rgb_pins[3], int enc_pin_a, int enc_pin_b) {
+  encoder = new Encoder(enc_pin_a, enc_pin_b);
+  for (int i = 0; i < 3; i++) {
+    pinMode(rgb_pins[i], OUTPUT);
 
-/* cycles from 0-2^24*/
-void writeRGB(unsigned int count) {
-  unsigned int trimmed = count % int(pow(2, 24));
-  unsigned char *colors = (unsigned char *)&trimmed;
-  unsigned char r = colors[0], g = colors[1], b = colors[2];
-  analogWrite(redPin, r);
-  analogWrite(greenPin, g);
-  analogWrite(bluePin, b);
-  Serial.println("r, g, b");
-  Serial.println(r, DEC);
-  Serial.println(g, DEC);
-  Serial.println(b, DEC);
+    LED color = {rgb_pins[i], 0};
+    RGB[i] = color;
+  }
+  current_led = &RGB[0];
+  current_led_idx = 0;
 
 }
 
+void RGBEncoder::write(LED *led) {
+  Serial.println("R, G, B");
+  Serial.println(RGB[0].last_position);
+  Serial.println(RGB[1].last_position);
+  Serial.println(RGB[2].last_position);
+  analogWrite(led->pin, led->last_position % 255);
+}
+
+void RGBEncoder::next() {
+  if (current_led_idx == 2) {
+    current_led_idx = 0;
+  } 
+  else {
+    current_led_idx++;
+  }
+  current_led = &RGB[current_led_idx];
+  encoder->write(current_led->last_position);
+  this->write(current_led);
+}
+
+void RGBEncoder::check() {
+  long new_position = encoder->read();
+  if (new_position != current_led->last_position) {
+    current_led->last_position = new_position;
+    this->write(current_led);
+  }
+}
 
 void loop() {
-
-
-  long newPosition = myEnc.read();
-  if (newPosition != oldPosition) {
-    oldPosition = newPosition;
-    Serial.println(newPosition);
-    writeRGB(newPosition);
-  }
-
+  rgb->check();
+  toggle->check();
+  delay(100);
 }
+
 
 
 
